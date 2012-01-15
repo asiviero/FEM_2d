@@ -64,13 +64,25 @@ element* scanElements(char *elementFile,int *nElements) {
 	return elementVector;
 }
 
+int* buildIDArrangement(node *nodeVector, int nNodes, int *nEq) {
+	int id_counter=0;
+	int *idArrangement;
+	idArrangement = (int*)calloc(nNodes,sizeof(int));
+	for(int i=0;i<nNodes;i++) {
+		if(nodeVector[i].z == 0) idArrangement[i] = ++id_counter;
+		else idArrangement[i] = 0;
+	}
+	*nEq = id_counter;
+	return idArrangement;
+}
+
 
 int main(int argc,char **argv) {
 	if(argc!=2) {
 		printf("\nUsage: ./FEM_2d meshfile.d\n\n");
 		exit(1);
 	}
-	int *nNodes,*nElements;
+	int *nNodes,*nElements,*nEq;
 	printf("Generating Mesh...\n");
 	/*
 	 * Manipulacao de Strings relativas a nomes de arquivos
@@ -91,10 +103,34 @@ int main(int argc,char **argv) {
 	 */
 	printf("\nGenerating Node Vector...\n");
 	node *nodeVector;
+
 	nodeVector = scanNodes(nodeFile,&nNodes);
+	debug();
 	for(int i=0;i<10;i++) printf("%d: %lf %lf %lf\n",nodeVector[i].id,nodeVector[i].x,nodeVector[i].y,nodeVector[i].z);
 	//nNodes = *nNodesP;
 	printf("nNodes: %d\n",nNodes);
+
+	/*
+	 * Now, the nodes must be grouped in triangular elements. A vector of 3-element generic list will be used
+	 * for this, in a similar way to what has been done with the node vector
+	 */
+	element *elementVector;
+	elementVector = scanElements(elementFile,&nElements);
+
+	/*
+	 * After grouping, the ID arrangement is done.
+	 *
+	 * The ID arrangement is an array which has the same number of elements as the number of nodes.
+	 * For each node, an integer is assigned, being 0 for prescripted nodes and j for incognite nodes,
+	 * in a manner that j starts in 1 and goes until nEq, which is the number of equations that will
+	 * come up in the linear system associated to the problem.
+	 */
+	int *idArrangement;
+	idArrangement = buildIDArrangement(nodeVector,nNodes,&nEq);
+	printf("ID Arrangement:\n\n");
+	for(int i=0;i<10;i++) printf("%d: %d\n",i,idArrangement[i]);
+	printf("\nNumber of equations: %d\n",nEq);
+
 	/*
 	 * Next, contour conditions are gonna be applied.
 	 *
@@ -111,14 +147,54 @@ int main(int argc,char **argv) {
 	 * Add as many Contour conditions needed here
 	 */
 	for(int i=0;i<10;i++) printf("%d: %lf %lf %lf\n",nodeVector[i].id,nodeVector[i].x,nodeVector[i].y,nodeVector[i].z);
+
 	/*
-	 * Now, the nodes must be grouped in triangular elements. A vector of 3-element generic list will be used
-	 * for this, in a similar way to what has been done with the node vector
+	 * Now we perform the elementary calculus needed
 	 */
-	element *elementVector;
-	elementVector = scanElements(elementFile,&nElements);
+	double JMatrix[2][2];
+
+	calculateJMatrix(0,nodeVector,elementVector,JMatrix);
+	printf("\n\n test: %lf\n",JMatrix[0][0]);
+	printf("test: %lf\n",JMatrix[0][1]);
+	printf("test: %lf\n",JMatrix[1][0]);
+	printf("test: %lf\n",JMatrix[1][1]);
+
+	double KeMatrix[3][3];
+	double I[2][2];
+	I[0][0] = 1;
+	I[0][1] = 0;
+	I[1][0] = 0;
+	I[1][1] = 1;
+
+	calculateKeMatrix(0,nodeVector,elementVector,KeMatrix,I);
+	printf("Matriz Ke:\n\n");
+	for(int i=0;i<3;i++) {
+		for(int j=0;j<3;j++) printf("%lf ",KeMatrix[i][j]);
+		printf("\n");
+	}
+
+
+
 
 	free(nodeVector);
 	free(elementVector);
 	return 0;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
